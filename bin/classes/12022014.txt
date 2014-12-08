@@ -1,0 +1,451 @@
+package com.example.deneme_1;
+
+import java.io.IOException;
+import java.util.Random;
+
+import org.anddev.andengine.audio.sound.Sound;
+import org.anddev.andengine.audio.sound.SoundFactory;
+import org.anddev.andengine.engine.Engine;
+import org.anddev.andengine.engine.camera.Camera;
+import org.anddev.andengine.engine.handler.timer.ITimerCallback;
+import org.anddev.andengine.engine.handler.timer.TimerHandler;
+import org.anddev.andengine.engine.options.EngineOptions;
+import org.anddev.andengine.engine.options.EngineOptions.ScreenOrientation;
+import org.anddev.andengine.engine.options.resolutionpolicy.RatioResolutionPolicy;
+import org.anddev.andengine.entity.scene.Scene;
+import org.anddev.andengine.entity.sprite.AnimatedSprite;
+import org.anddev.andengine.entity.sprite.Sprite;
+import org.anddev.andengine.entity.util.FPSLogger;
+import org.anddev.andengine.opengl.font.Font;
+import org.anddev.andengine.opengl.font.FontFactory;
+import org.anddev.andengine.opengl.texture.BuildableTexture;
+import org.anddev.andengine.opengl.texture.Texture;
+import org.anddev.andengine.opengl.texture.TextureOptions;
+import org.anddev.andengine.opengl.texture.region.TextureRegion;
+import org.anddev.andengine.opengl.texture.region.TextureRegionFactory;
+import org.anddev.andengine.opengl.texture.region.TiledTextureRegion;
+import org.anddev.andengine.ui.activity.BaseGameActivity;
+import org.anddev.andengine.input.touch.TouchEvent;
+import org.anddev.andengine.entity.scene.Scene.IOnSceneTouchListener;
+import org.anddev.andengine.entity.scene.background.ColorBackground;
+import org.anddev.andengine.entity.scene.background.SpriteBackground;
+import org.anddev.andengine.entity.text.ChangeableText;
+
+import android.graphics.Color;
+import android.widget.Toast;
+
+
+
+public class MainActivity extends BaseGameActivity {
+
+	private static final int CAMERA_WIDTH = 480;
+	private static final int CAMERA_HEIGHT = 800;
+	private Camera camera;
+	
+	private Scene scene;
+	private Scene sceneMenu;
+	private Scene sceneGameOver;
+	
+	private Texture textureResim1;
+	private TextureRegion textRegResim1;
+	private Sprite spriteResim;
+	
+	private Texture textureBG;
+	private TextureRegion textRegBG;
+	private Sprite spriteBG;
+	
+	private Texture textAnime;
+	private TiledTextureRegion tiledTexReg;
+	private AnimatedSprite animSprite;
+	
+	private Sprite[] blocksSprite = new Sprite[10];
+	
+	private Random rand = new Random();
+	
+	/*Yazı için kullanılacak nesneler...*/
+	private Font font;
+	private BuildableTexture bTex;
+	private ChangeableText cTexSkor;
+	
+	private Sound flySoundUp;
+	private Sound flySoundRight;
+	
+	
+	/*Deneme nesneleri*/
+	private Sprite denemeSprite; //Sil!
+	private ChangeableText cTexDeneme; //Sil!
+	
+	
+	
+	
+	@Override
+	public Engine onLoadEngine() {
+		
+		camera = new Camera(0, 0, CAMERA_WIDTH, CAMERA_HEIGHT);
+	    
+		final EngineOptions engineOptions = new EngineOptions(true, ScreenOrientation.PORTRAIT, new RatioResolutionPolicy(CAMERA_WIDTH, CAMERA_HEIGHT), camera);
+		engineOptions.getTouchOptions().setRunOnUpdateThread(true);
+		engineOptions.setNeedsSound(true); //Ses oynatabilmek için.
+	    Engine engine = new Engine(engineOptions);
+		
+	    return engine;
+	}
+
+	@Override
+	public void onLoadResources() {
+		
+		textureResim1 = new Texture(256,32,TextureOptions.BILINEAR_PREMULTIPLYALPHA);
+		textRegResim1 = TextureRegionFactory.createFromAsset(textureResim1, this, "gfx/block.png", 0, 0);
+		
+		textureBG = new Texture(512,1024,TextureOptions.BILINEAR_PREMULTIPLYALPHA);
+		textRegBG = TextureRegionFactory.createFromAsset(textureBG, this, "gfx/bg_.png", 0, 0);
+		
+		textAnime = new Texture(128, 64, TextureOptions.BILINEAR_PREMULTIPLYALPHA);
+		
+		createFlySounds(mEngine);
+		createTextObject(mEngine);
+		
+		//0, 0 parametreli frame'in başlama kordinatları.
+		tiledTexReg = TextureRegionFactory.createTiledFromAsset(textAnime, this, "gfx/tile2.png", 0, 0, 4, 2);
+		
+		mEngine.getTextureManager().loadTexture(textAnime);
+		mEngine.getTextureManager().loadTexture(textureBG);
+		mEngine.getTextureManager().loadTexture(textureResim1); 
+	}
+
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	float distanceBetweenBlocksY = 175;
+	float distanceBetweenBlocksX = 100;
+	float blockCount = 8;
+	float blockHeight = 30;
+	float XKOR = 0;
+	float YKOR = 0;
+	float KORVALUE = 40;
+	float gravity = 0.9f;  
+	float speedY = 0; 
+	float speedX = 5;
+	float blockSpeed = 1;
+	int spriteSize = 32;
+	int skor = 0;
+	long animationSpeed = 33;
+	
+	boolean continueGame = false;
+	boolean ySpeedBool = false;
+	boolean isTouch = false;
+	boolean isTouchCenter = false;
+	boolean isTouchLeft = false;
+	boolean isTouchRight = false;
+	
+	@Override
+	public Scene onLoadScene() {
+		
+		mEngine.registerUpdateHandler(new TimerHandler(0.02f, true, new ITimerCallback() {
+	        @Override
+	        public void onTimePassed(final TimerHandler pTimerHandler) {
+	        	if(continueGame)
+	        	{
+	        		drawBird(pTimerHandler.getTimerSeconds());
+	        		updateBlocks(pTimerHandler.getTimerSeconds());
+	        		isCollision();
+	        	}
+	        }
+		}));
+		
+		this.scene = new Scene();
+
+		//Bunları draw block yap, drawblocktakiler, updateblocks yap.
+		drawBlocks();
+		
+		/*Deneme Alanı Başlangıç | Silinecek!     /*
+		denemeSprite = new Sprite(0, 100, textRegResim1);
+		denemeSprite.setSize(222, 20);
+		scene.attachChild(denemeSprite);
+		/*Deneme Alanı Bitiş | Silinecek!*/
+		
+        animSprite = new AnimatedSprite(CAMERA_WIDTH/2 - spriteSize/2, CAMERA_HEIGHT - spriteSize, tiledTexReg);
+        spriteBG = new Sprite(0, 0, textRegBG);
+		
+        this.scene.setOnSceneTouchListener(new IOnSceneTouchListener() {
+			@Override
+			public boolean onSceneTouchEvent(Scene pScene, TouchEvent pSceneTouchEvent) {
+
+				/*Arka arkaya basıldığında yükseliyormuş şekli verilmesi için...*/
+				if(speedY < -9.0f)
+					animSprite.stopAnimation();
+				else
+					animSprite.animate(animationSpeed);
+				cTexDeneme.setText(String.valueOf(speedY));
+				
+				continueGame = true;
+				//Bu koşul sürekli basımı engeller. (Basılı tutmayı)
+				if(pSceneTouchEvent.isActionDown()) {
+					
+					skor++;
+					cTexSkor.setText(String.valueOf(skor));
+					
+					if(pSceneTouchEvent.getX() > CAMERA_WIDTH - spriteSize * 2)
+					{
+						if(flySoundRight != null)
+							flySoundRight.play();
+						
+						isTouchRight = true;
+						isTouchLeft = false;
+			        	isTouchCenter = false;
+					}
+					else if(pSceneTouchEvent.getX() < spriteSize * 2)
+					{
+						if(flySoundRight != null)
+							flySoundRight.play();
+						
+						isTouchRight = false;
+		        		isTouchCenter = false;
+						isTouchLeft = true;
+					}
+					else //Topun yörüngesine dokunuldu ise... 	
+						 //Zor mod yap ve bu seçeneği kaldır :)
+					{
+						if(flySoundUp != null)
+							flySoundUp.play();
+						
+						isTouchCenter = true;
+						isTouchLeft = false;
+		        		isTouchRight = false;
+					}
+					    animSprite.animate(animationSpeed);
+						isTouch = true;
+						ySpeedBool = true;
+					}
+					return false;
+			}
+		});
+
+        for(int i=0; i<blockCount; i++)
+        {
+        	scene.registerTouchArea(blocksSprite[i]); //Olmazsa olmaz!
+        	scene.attachChild(blocksSprite[i]);
+        }
+        
+        scene.attachChild(animSprite);
+        
+        //Skor tabelası eklenir.
+        cTexSkor = new ChangeableText(300, 40, this.font, "", 3);
+        cTexSkor.setText("0");
+        scene.attachChild(cTexSkor);
+        
+        /*Deneme amaçlı text! !Sil*/
+        cTexDeneme = new ChangeableText(0, 0, this.font, "", 10);
+        cTexDeneme.setText("DenemeLog");
+        scene.attachChild(cTexDeneme);
+        
+        scene.setBackground(new SpriteBackground(spriteBG));
+        //scene.setBackground(new ColorBackground(0, 234, 255));
+        return this.scene;
+	}
+
+	@Override
+	public void onLoadComplete() {
+		// TODO Auto-generated method stub
+	}
+	
+	
+	
+	
+	/*Sadece karakteri çizmez, jumping, gravity, velocity burada ayarlanır!*/
+	public void drawBird(float timerSeconds)
+
+	{
+		YKOR = animSprite.getY();
+		XKOR = animSprite.getX();
+	
+		if(isTouch) {//Gravity 
+			
+			if(ySpeedBool)
+			{
+			speedY = -10.0f;
+			ySpeedBool = false;
+			}
+			  
+			
+		if(isTouchRight) {
+			XKOR += speedX * timerSeconds * KORVALUE;
+    		YKOR += speedY * timerSeconds * KORVALUE;      
+    		speedY += gravity * timerSeconds * KORVALUE; 
+		}
+		else if(isTouchLeft) {
+			XKOR -= speedX * timerSeconds * KORVALUE;
+        	YKOR += speedY * timerSeconds * KORVALUE;      
+        	speedY += gravity * timerSeconds * KORVALUE;  
+		}
+		else if(isTouchCenter){
+			YKOR += speedY * timerSeconds * KORVALUE;      
+			speedY += gravity * timerSeconds * KORVALUE;   
+		}
+		
+		//YKOR > CAMERA_HEIGHT - spriteResim1.getWidth()
+    	if (YKOR > CAMERA_HEIGHT - spriteSize) {
+    		isTouch = false;  	
+    		isTouchCenter = false;
+    		isTouchLeft = false;
+    		isTouchRight = false;
+    		animSprite.stopAnimation();
+    	}
+    	
+    	//spriteResim1.setPosition(XKOR, YKOR);	
+		animSprite.setPosition(XKOR, YKOR);
+		}
+		
+	}
+	
+	public void updateBlocks(float timerSeconds)
+	{
+		float tempY, sizeW; //_ olanlar sağ taraftaki blocklar için olutşuruldu.
+		for(int i=0; i<blockCount; i++)
+		{	
+			if(i%2 == 0)
+			{
+				tempY = blocksSprite[i].getY();
+				
+				tempY += blockSpeed;
+				
+				if(blocksSprite[i].getY() > CAMERA_HEIGHT)
+				{
+					tempY = 0;
+					
+					sizeW = rand.nextInt(350);
+					blocksSprite[i].setSize(sizeW, blockHeight);
+				}
+				blocksSprite[i].setPosition(0, tempY);
+			}	
+			else if(i % 2 == 1)
+			{
+				tempY = blocksSprite[i].getY();
+				tempY += blockSpeed;
+				
+				if(blocksSprite[i].getY() > CAMERA_HEIGHT)
+				{
+					tempY = 0;
+					
+					sizeW = (int) ((CAMERA_WIDTH - blocksSprite[i - 1].getWidth()) - distanceBetweenBlocksX);
+					
+					blocksSprite[i].setSize(sizeW, blockHeight);
+				}
+					
+				blocksSprite[i].setPosition(blocksSprite[i - 1].getWidth() + distanceBetweenBlocksX, tempY);
+				//Bu formül ilede olur, sizeW kullanarakta olabilir.
+				
+			}
+		}
+	}
+
+	public void isCollision()
+	{
+		float sprX = animSprite.getX();
+		float sprY = animSprite.getY();
+		float bX,bY;
+		
+		for(int i=0; i<blockCount; i++)
+		{
+			bX = blocksSprite[i].getX();
+			bY = blocksSprite[i].getY();
+
+			if((sprX >= bX && sprX < bX + blocksSprite[i].getWidth() && sprY >= bY && sprY < bY + blocksSprite[i].getHeight())
+			|| (sprX + spriteSize >= bX && sprX + spriteSize < bX + blocksSprite[i].getWidth() && sprY >= bY && sprY < bY + blocksSprite[i].getHeight())
+			|| (sprX >= bX && sprX < bX + blocksSprite[i].getWidth() && sprY + spriteSize >= bY && sprY + spriteSize < bY + blocksSprite[i].getHeight())
+			|| (sprX + spriteSize >= bX && sprX + spriteSize < bX + blocksSprite[i].getWidth() && sprY + spriteSize >= bY && sprY + spriteSize < bY + blocksSprite[i].getHeight()))
+			{
+				animSprite.setPosition(CAMERA_WIDTH/2 - spriteSize/2, CAMERA_HEIGHT - spriteSize);
+				continueGame = false;
+				skor = 0;
+			}
+		}
+	}
+	
+	public void createFlySounds(Engine mEngine)
+	{
+		try
+		{
+			if(flySoundUp == null)
+			{
+				flySoundUp = SoundFactory.createSoundFromAsset(this.mEngine.getSoundManager(), this, "sounds/touch1.mp3");
+			}
+			else
+			{
+				flySoundUp = null;
+				flySoundUp = SoundFactory.createSoundFromAsset(this.mEngine.getSoundManager(), this, "sounds/touch1.mp3");	
+			}
+			
+			if(flySoundRight == null)
+			{
+				flySoundRight = SoundFactory.createSoundFromAsset(this.mEngine.getSoundManager(), this, "sounds/touch2.mp3");
+			}
+			else
+			{
+				flySoundRight = null;
+				flySoundRight = SoundFactory.createSoundFromAsset(this.mEngine.getSoundManager(), this, "sounds/touch2.mp3");	
+			}
+		}	
+		catch(IllegalStateException e)
+		{
+			e.printStackTrace();
+		}
+		catch (IOException e) 
+		{
+			e.printStackTrace();
+		}
+	}
+	
+	public void createTextObject(Engine mEngine)
+	{
+		if(bTex == null)
+		{
+			bTex = new BuildableTexture(256, 256, TextureOptions.BILINEAR_PREMULTIPLYALPHA);
+		}
+		else
+		{
+			bTex = null;
+			bTex = new BuildableTexture(256, 256, TextureOptions.BILINEAR_PREMULTIPLYALPHA);
+		}
+		mEngine.getTextureManager().loadTexture(bTex);
+	
+		this.font = FontFactory.createStrokeFromAsset(this.bTex, this, "fonts/arcade.ttf", 75, true, Color.RED, 2, Color.rgb(97, 134, 147));
+		mEngine.getFontManager().loadFont(font);
+	}
+	
+	
+	public void drawBlocks()
+	{
+		int sizeW;
+		for(int i=0; i<blockCount; i++)
+		{
+			if(i%2==0)
+			{
+				//blockX = rand.nextInt(225);
+				spriteResim = new Sprite(0, i/2 * distanceBetweenBlocksY, textRegResim1);
+				
+				sizeW = rand.nextInt(350);
+				spriteResim.setSize(sizeW, blockHeight);
+				blocksSprite[i] = spriteResim;
+			}
+			else if(i%2==1)
+			{
+				sizeW = (int) ((CAMERA_WIDTH - blocksSprite[i - 1].getWidth()) - distanceBetweenBlocksX);
+				 
+				spriteResim = new Sprite(blocksSprite[i - 1].getWidth() + distanceBetweenBlocksX, (i-1)/2 * distanceBetweenBlocksY, textRegResim1);
+				//Bu formül ilede olur, sizeW kullanarakta olabilir.
+				
+				spriteResim.setSize(sizeW, blockHeight);
+				blocksSprite[i] = spriteResim;
+			}
+		}
+	}
+}
+
+

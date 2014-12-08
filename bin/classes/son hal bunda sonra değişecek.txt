@@ -1,0 +1,128 @@
+package com.example.deneme_1;
+
+
+import org.anddev.andengine.engine.Engine;
+import org.anddev.andengine.engine.camera.Camera;
+import org.anddev.andengine.engine.handler.timer.ITimerCallback;
+import org.anddev.andengine.engine.handler.timer.TimerHandler;
+import org.anddev.andengine.engine.options.EngineOptions;
+import org.anddev.andengine.engine.options.EngineOptions.ScreenOrientation;
+import org.anddev.andengine.engine.options.resolutionpolicy.RatioResolutionPolicy;
+import org.anddev.andengine.entity.scene.Scene;
+import org.anddev.andengine.entity.sprite.Sprite;
+import org.anddev.andengine.entity.util.FPSLogger;
+import org.anddev.andengine.opengl.texture.Texture;
+import org.anddev.andengine.opengl.texture.TextureOptions;
+import org.anddev.andengine.opengl.texture.region.TextureRegion;
+import org.anddev.andengine.opengl.texture.region.TextureRegionFactory;
+import org.anddev.andengine.ui.activity.BaseGameActivity;
+import org.anddev.andengine.input.touch.TouchEvent;
+import org.anddev.andengine.entity.scene.Scene.IOnSceneTouchListener;
+import org.anddev.andengine.entity.scene.Scene.IOnAreaTouchListener;
+import org.anddev.andengine.entity.scene.Scene.ITouchArea;
+
+import android.text.method.Touch;
+import android.util.Log;
+
+
+
+public class MainActivity extends BaseGameActivity {
+
+	private static final int CAMERA_WIDTH = 480;
+	private static final int CAMERA_HEIGHT = 800;
+	private Camera camera;
+	private Scene scene;
+	Texture textureResim1;
+	TextureRegion textRegResim1;
+	Sprite spriteResim1;
+	
+	
+	@Override
+	public Engine onLoadEngine() {
+		camera = new Camera(0, 0, CAMERA_WIDTH, CAMERA_HEIGHT);
+	    final EngineOptions engineOptions = new EngineOptions(true, ScreenOrientation.PORTRAIT, new RatioResolutionPolicy(CAMERA_WIDTH, CAMERA_HEIGHT), camera);
+	    engineOptions.getTouchOptions().setRunOnUpdateThread(true);
+		Engine engine = new Engine(engineOptions);
+		
+	    return engine;
+	}
+
+	@Override
+	public void onLoadResources() {
+		textureResim1=new Texture(64,64,TextureOptions.BILINEAR_PREMULTIPLYALPHA);
+		
+		textRegResim1 = TextureRegionFactory.createFromAsset(textureResim1, this, "gfx/ball.png", 0, 0);
+		mEngine.getTextureManager().loadTextures(textureResim1); 
+	}
+
+
+	float YKOR = 0;
+	float gravity = 0.5f;  
+	float speedY = 0; 
+	float speedX = 2;
+	boolean isTouch = false;
+	@Override
+	public Scene onLoadScene() {
+		
+		mEngine.registerUpdateHandler(new TimerHandler(0.02f, true, new ITimerCallback() {
+	        @Override
+	        public void onTimePassed(final TimerHandler pTimerHandler) {
+	        	
+	        	if(isTouch) {//Gravity 
+		        	YKOR = spriteResim1.getY();
+		        	YKOR = YKOR + speedY;
+		        	speedY = speedY + gravity;
+		        	if (YKOR > CAMERA_HEIGHT - spriteResim1.getWidth()) {
+		        	    speedY = speedY * -1f;  
+		        	}
+		        	
+		        	spriteResim1.setPosition(spriteResim1.getX(), YKOR);	        	
+		        }
+	        }
+		}));
+		
+		this.scene = new Scene();
+        
+        spriteResim1 = new Sprite(CAMERA_WIDTH/2 - 32, CAMERA_HEIGHT - 64, textRegResim1); /*{
+            @Override
+            public boolean onAreaTouched(final TouchEvent pSceneTouchEvent, final float pTouchAreaLocalX, final float pTouchAreaLocalY) {
+                    this.setPosition(pSceneTouchEvent.getX() - this.getWidth() / 2, pSceneTouchEvent.getY() - this.getHeight() / 2);
+                    return true;
+            } 
+        };*/
+        
+        this.scene.setOnSceneTouchListener(new IOnSceneTouchListener() {
+			@Override
+			public boolean onSceneTouchEvent(Scene pScene, TouchEvent pSceneTouchEvent) {
+				
+				/*if(speedY >= 0)
+				{
+					speedY = speedY * -0.70f + spriteResim1.getHeight()/100;  
+				}
+				else 
+				{	
+					speedY = speedY * 0.70f  + spriteResim1.getHeight()/100;  
+				}*/
+				isTouch = true;
+				if(pSceneTouchEvent.getX() > spriteResim1.getX() + spriteResim1.getWidth())
+					spriteResim1.setPosition(spriteResim1.getX() + speedX, spriteResim1.getY());
+				else if(pSceneTouchEvent.getX() < spriteResim1.getX())
+					spriteResim1.setPosition(spriteResim1.getX() - speedX, spriteResim1.getY());
+				return false;
+			}
+		});
+
+        //spriteResim1.setScale(2);  //Boyutunu büyütür.
+        scene.registerTouchArea(spriteResim1); //Olmazsa olmaz!
+        scene.attachChild(spriteResim1);
+        //scene.setTouchAreaBindingEnabled(true);
+		
+        return this.scene;
+	}
+
+	@Override
+	public void onLoadComplete() {
+		// TODO Auto-generated method stub
+		
+	}
+}
